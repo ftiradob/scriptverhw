@@ -1,0 +1,238 @@
+#! /bin/bash
+
+#19. Escribe un script que muestre por pantalla las características de los elementos fundamentales de hardware: CPU Memoria RAM Listado de discos (Tipo y capacidad) Listado de interfaces de red (mostrando chip) Listado de tarjetas gráficas (mostrando chip).
+#EXTRA:
+#
+# - Rendimiento CPU tras estresar
+# - Manejo de núcleos
+# - Número de núcleos
+# - Número de discos
+
+listainterfaces(){
+sudo apt-get install -y netstat &>/dev/null
+clear
+echo ""
+echo "INTERFACES DE RED"
+echo "-----------------"
+netstat -i | cut -d" " -f1 | grep -v Iface | grep -v Kernel
+echo ""
+}
+
+funcion_su(){
+	while :
+	do
+		read -p "Para esta función necesita superusuario, ¿desea continuar? [S/N]" r1
+		if [[ $r1 = "S" || $r1 = "s" ]]
+		then
+			break
+		elif [[ $r1 = "N" || $r1 = "n" ]]
+		then
+			clear
+			echo "Desconexión"
+			exit
+		else
+			echo "Error de opción"
+		fi
+	done
+}
+
+funcion_activacionesnucleo(){
+	while :
+	do
+		read -p "¿Desea manejar algún nucleo? [S/N]" r2
+		if [[ $r2 = "S" || $r2 = "s" ]]
+		then
+			clear
+			echo ""
+			echo "Nº CPU			¿ACTIVADO?"
+			echo "------			----------"
+			lscpu -ae | cut -d" " -f1,25 | sed '/ /s/ /                          /' | tr -d CPU
+			echo ""
+			read -p "¿Qué nucleo desea manejar?" nucleo
+			numnu=$(lscpu -ae | cut -d" " -f1,25 | sed '/ /s/ /                          /' | tr -d CPU | wc -l)
+			if [[ $nucleo -ge 1 && $nucleo -lt $numnu ]]
+			then
+				while :
+				do
+
+				echo ""
+				echo "1. Activar"
+				echo "2. Desactivar"
+				echo "0. Salir"
+				read -p "Elija opción: " opcionf
+
+				case $opcionf in
+
+				1) 
+
+				clear
+				echo ""
+				sudo chcpu -e $nucleo;;
+
+				2)
+
+				clear
+				echo ""
+				sudo chcpu -d $nucleo;;
+
+				0) break;;
+
+				*) echo "Error de opción";;
+
+				esac
+				done
+			else
+				echo "Error de opción"
+			fi
+
+		elif [[ $r2 = "N" || $r2 = "n" ]]
+		then
+			break
+		else
+			echo "Error de opción"
+		fi
+	done
+}
+
+rendimiento(){
+while :
+do
+	read -p "¿Quiere probar el rendimiento del PC? [S/N]" ren
+	if [[ $ren = "S" || $ren = "s" ]]
+	then
+		sudo apt-get install -y lm-sensors &>/dev/null
+		sudo apt-get install -y stress &>/dev/null
+		clear
+		stress -q -i 5 -t 20s&
+		echo "Cargando stress... "
+		sleep 5
+		clear
+		echo ""
+		echo "TEMPERATURA"
+		echo "-----------"
+		sudo sensors | grep °
+		#sensors | grep Core
+		echo ""
+		#ps -o cmd,pcpu | grep stress | cut -d" " -f14
+	elif [[ $ren = "N" || $ren = "n" ]]
+	then
+		echo "Rechazando stress.."
+		sleep 3
+		clear
+		break
+	else
+		echo "Error de opción"
+	fi
+done
+}
+
+#Menu
+while :
+do
+
+echo ""
+echo "~~~~~ HARDWARE ~~~~~~"
+echo ""
+echo "1. CPU"
+echo "2. Memoria RAM y SWAP"
+echo "3. Discos"
+echo "4. Interfaces de red"
+echo "5. Tarjetas gráficas"
+echo "0. Salir"
+read -p "Elija opción: " opcion
+
+case $opcion in
+
+1) 
+
+funcion_su
+clear
+sudo apt-get install -y lshw &>/dev/null
+clear
+procesador=$(sudo lshw | sed -n /*-cpu/,/vendor/p | egrep "product" | cut -d":" -f2)
+echo "Mi procesador es: " $procesador
+numeronucleos=$(nproc)
+echo "El número de cores de la CPU es: " $numeronucleos
+funcion_activacionesnucleo
+rendimiento;;
+#Probar rendimiento con stress
+
+2)
+echo ""
+echo "RAM"
+echo "---"
+set `free -h | grep Mem:`
+echo "Total de la máquina es de: " $2
+echo "En uso en este momento es de: " $3
+echo "Libre en este momento es de: " $4
+echo ""
+echo "SWAP"
+echo "----"
+set `free -h | grep Swap:`
+echo "Total de la máquina es de: " $2
+echo "En uso en este momento es de: " $3
+echo "Libre en este momento es de: " $4
+echo "";;
+
+3)
+
+sudo apt-get install -y lsscsi &>/dev/null
+clear
+numerodiscos=$(lsscsi | egrep "disk" | wc -l)
+nombrediscos=$(lsscsi -s | egrep "disk" | cut -d"/" -f3)
+echo "Contamos con " $numerodiscos "disco(s) en el sistema: "
+echo ""
+echo $nombrediscos
+echo ""
+while :
+do
+	read -p "¿Quiere consultar la información de la(s) partición(es)? (le pediremos la contraseña) [S/N]" res1
+	if [[ $res1 = "N" || $res1 = "n" ]]
+	then
+		break
+	elif [[ $res1 = "S" || $res1 = "s" ]]
+	then
+		sudo apt-get install -y parted &>/dev/null
+		clear
+		sudo echo ""
+		echo "NÚMERO, TAMAÑO, TIPO Y SISTEMA DE FICHEROS DE PARTICIONES"
+		echo "---------------------------------------------------------"
+		echo ""
+		sudo parted -l | grep -v Model | grep -v Sector | grep -v Partition
+		break
+		#numeroparticiones=$(lsblk | grep $res1 | grep part | wc -l)
+	else
+		echo "Error de opción"
+	fi
+done;;
+#https://eltallerdelbit.com/comandos-linux-discos-duros-particiones/
+
+4)
+
+sudo apt-get install -y lshw &>/dev/null
+clear
+listainterfaces
+dispoethernet=$(sudo lshw | grep Ethernet | grep product | cut -d" " -f18)
+echo "El dispositivo de ethernet es: " $dispoethernet;;
+
+5)
+
+funcion_su
+sudo apt-get install -y lshw &>/dev/null
+clear
+sudo apt-get install -y lspci &>/dev/null
+clear
+echo ""
+nombretarjeta=$(sudo lshw -class display | egrep "product" | cut -d":" -f2)
+numerografica=$(sudo lspci | grep VGA | cut -d"V" -f1)
+memoriagrafica=$(sudo lspci -v -s $numerografica | grep ", prefetchable" | cut -d"=" -f2 | tr -d ])
+echo "Tu tarjeta gráfica es: " $nombretarjeta
+echo "Cuenta con " $memoriagrafica "de memoria."
+echo "";;
+
+0) exit;;
+
+*) echo "Error de opción";;
+
+esac
+done
